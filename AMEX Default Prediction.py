@@ -116,11 +116,11 @@ y_train_resampled.mean(), X_train_resampled.shape
 
 # COMMAND ----------
 
-C_ = 0.07727850835507746
-l1_ratio = 0.6627998959125167
-max_iter = 2_300
-solver = 'lbfgs'
-#penalty = 'none'
+C_ = 0.36257120538682047 #0.07727850835507746
+l1_ratio = 0.8994364898813669 #0.6627998959125167
+max_iter = 900 #2_300
+solver = 'newton-cg' #'lbfgs'
+penalty = 'none'
 
 # COMMAND ----------
 
@@ -139,6 +139,10 @@ model.fit(X_train_resampled, y_train_resampled)
 
 # COMMAND ----------
 
+joblib.dump(model, '/dbfs/FileStore/amex/performance/trial3/model.pkl')
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC #### **Perfomance**
 # MAGIC - Now will look at the performance of our model
@@ -151,7 +155,7 @@ model.fit(X_train_resampled, y_train_resampled)
 
 # COMMAND ----------
 
-model = joblib.load('/dbfs/FileStore/amex/performance/trial1/model.pkl')
+model = joblib.load('/dbfs/FileStore/amex/performance/trial3/model.pkl')
 
 # COMMAND ----------
 
@@ -166,15 +170,15 @@ def plot_perfomance(image_path, height = 700, width = 1050, dpi = 72):
 
 # COMMAND ----------
 
-plot_perfomance('/dbfs/FileStore/amex/performance/trial1/training_confusion_matrix.png', dpi = 128)
+plot_perfomance('/dbfs/FileStore/amex/performance/trial3/training_confusion_matrix.png', dpi = 128)
 
 # COMMAND ----------
 
-plot_perfomance('/dbfs/FileStore/amex/performance/trial1/training_roc_curve.png')
+plot_perfomance('/dbfs/FileStore/amex/performance/trial3/training_roc_curve.png')
 
 # COMMAND ----------
 
-plot_perfomance('/dbfs/FileStore/amex/performance/trial1/training_precision_recall_curve.png')
+plot_perfomance('/dbfs/FileStore/amex/performance/trial3/training_precision_recall_curve.png')
 
 # COMMAND ----------
 
@@ -189,13 +193,13 @@ plot_perfomance('/dbfs/FileStore/amex/performance/trial1/training_precision_reca
 
 # COMMAND ----------
 
-model.score(X_test, y_test)
-
-# COMMAND ----------
-
 def test_classification_report(model, X, y):
   y_predicted = model.predict(X)
   return print(classification_report(y,y_predicted))
+
+# COMMAND ----------
+
+model.score(X_test, y_test)
 
 # COMMAND ----------
 
@@ -227,7 +231,7 @@ len(feature_name)
 
 # MAGIC %md
 # MAGIC ### **2. Model training**
-# MAGIC - Now will train the model on the top 93 most important features
+# MAGIC - Now will train the model on the top 110 most important features
 
 # COMMAND ----------
 
@@ -273,7 +277,7 @@ feature_impt_test(model2, feature_idx)
 
 # COMMAND ----------
 
-feature_idx = model_import_features(model, 75)
+feature_idx = model_import_features(model, 110)
 
 # COMMAND ----------
 
@@ -294,8 +298,8 @@ feature_impt_test(model3, feature_idx)
 
 # COMMAND ----------
 
-feature_idx = model_import_features(model, 150)
-feature_impt_test(model2, feature_idx, X_valid, y_valid)
+feature_idx = model_import_features(model, 110)
+feature_impt_test(model3, feature_idx, X_valid, y_valid)
 
 # COMMAND ----------
 
@@ -308,7 +312,7 @@ feature_impt_test(model2, feature_idx, X_valid, y_valid)
 # COMMAND ----------
 
 feature_name = train_features[feature_idx]
-with open('/dbfs/FileStore/amex/performance/trial2/feature_name.txt', 'w+') as f:
+with open('/dbfs/FileStore/amex/performance/trial3/feature_name.txt', 'w+') as f:
   for items in feature_name:
         f.write('%s\n' %items)
      
@@ -317,4 +321,4 @@ f.close()
 
 # COMMAND ----------
 
-joblib.dump(model2, '/dbfs/FileStore/amex/performance/trial2/model2.pkl')
+joblib.dump(model3, '/dbfs/FileStore/amex/performance/trial3/model3.pkl')

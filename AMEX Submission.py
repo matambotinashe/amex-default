@@ -58,7 +58,7 @@ sum(submission_data.isnull().sum() > 0)
 
 features_name = []
 
-f = open('/dbfs/FileStore/amex/performance/trial2/feature_name.txt', 'r')
+f = open('/dbfs/FileStore/amex/performance/trial3/feature_name.txt', 'r')
  
 # display content of the file
 for x in f.readlines():
@@ -93,11 +93,11 @@ X.shape
 
 # COMMAND ----------
 
-model = joblib.load('/dbfs/FileStore/amex/performance/trial2/model2.pkl')
+model = joblib.load('/dbfs/FileStore/amex/performance/trial3/model3.pkl')
 
 # COMMAND ----------
 
-y_predict = model.predict(X)
+y_predict = model.predict_proba(X)
 y_predict[:10]
 
 # COMMAND ----------
@@ -109,7 +109,7 @@ y_predict[:10]
 # COMMAND ----------
 
 customer_id = list(customer_id)
-prediction = list(y_predict)
+prediction = list(np.round(np.transpose(np.transpose(y_predict.copy())[1]), 2))
 submission = pd.DataFrame(list(zip(customer_id, prediction)), columns = ['customer_ID', 'prediction'])
 submission.head()
 

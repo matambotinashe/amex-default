@@ -179,31 +179,6 @@ def objective(params):
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC {
-# MAGIC     'type': 'dtree',
-# MAGIC     'criterion': hp.choice('criterion', ['gini', 'entropy']),
-# MAGIC     'splitter': hp.choice('splitter', ['best', 'random']),
-# MAGIC     'max_depth':hp.choice('max_depth', [None, hp.quniform('max_depth_int', 2, 300, 10)]),
-# MAGIC     'min_samples_split': hp.quniform('min_samples_split', 0, 1, 0.001),
-# MAGIC     'min_samples_leaf': hp.quniform('min_samples_leaf', 0, 1, 0.001),
-# MAGIC     'max_features': hp.choice('max_features',
-# MAGIC             [hp.choice('max_features_str',['auto', 'sqrt', 'log2']), hp.quniform('max_features_int', 2, 300,10)])
-# MAGIC   },
-# MAGIC   
-# MAGIC   {
-# MAGIC     'type': 'rf',
-# MAGIC     'criterion': hp.choice('rf_criterion', ['gini', 'entropy']),
-# MAGIC     'splitter': hp.choice('rf_splitter', ['best', 'random']),
-# MAGIC     'max_depth':hp.choice('rf_max_depth', [None, hp.quniform('rf_max_depth_int', 2, 300, 10)]),
-# MAGIC     'min_samples_split': hp.quniform('rf_min_samples_split', 0, 1, 0.001),
-# MAGIC     'min_samples_leaf': hp.quniform('rf_min_samples_leaf', 0, 1, 0.001),
-# MAGIC     'max_features': hp.choice('rf_max_features',
-# MAGIC             [hp.choice('rf_max_features_str',['auto', 'sqrt', 'log2']), hp.quniform('rf_max_features_int', 2, 300, 10)])
-# MAGIC     },
-
-# COMMAND ----------
-
 search_space = hp.choice('classifier_type', [
   {
     'type': 'dtree',
