@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # __Amex  Data Exploring__
-# MAGIC - In this notebook will be exploring the data for predict credit default for American Express.
+# MAGIC # __Amex EDA__
+# MAGIC - In this notebook will be exploratory data analysis(EDA) on the data for predict credit default for American Express.
 # MAGIC - This is for the kaggle competiton on https://www.kaggle.com/competitions/amex-default-prediction.
 # MAGIC - Instead of using kaggle notebooks we have opted for databricks as the data is very large and databricks makes it easy to process it.
 # MAGIC 
@@ -10,7 +10,16 @@
 
 # COMMAND ----------
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from pyspark.sql.functions import *
+from pyspark.sql.window import Window
+
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.stat import Correlation
 
 # COMMAND ----------
 
@@ -26,7 +35,9 @@ from pyspark.sql.functions import *
 
 # COMMAND ----------
 
-train_data = spark.read.option('header', True).csv(train_data_path, inferSchema = True)
+temp_path = train_data_partition_out + 'part-0000*.csv'
+
+train_data = spark.read.option('header', True).csv(temp_path, inferSchema = True)
 train_data.display()
 
 # COMMAND ----------
@@ -72,6 +83,7 @@ train_labels.select('target').display()
 
 # MAGIC %md
 # MAGIC __Comments__
+# MAGIC - We have class inbalance for the target variable and we will address this on modelling.
 # MAGIC - Now will check if the unique number of customers in our train data correspond to those in the train labels data.
 # MAGIC - Will also make sure we do not have null values in the customer_ID column for our train_data.
 
@@ -111,18 +123,97 @@ s_2_duplicates.filter( col('same_date_entries') > 1 ).display()
 
 # COMMAND ----------
 
-train_data.groupby('S_2').agg(count('customer_ID').alias('records_per_date')).display()
+train_data.groupby('S_2').agg(count('customer_ID').alias('records_per_date')).sort(col('S_2').asc()).display()
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC __Comments__
 # MAGIC - We do not have the same dates for our customers as it looks like the data is just from 1 March 2017 to 31 March 2018.
+# MAGIC - This implies that the dates we have are somehow customer driven be through settern attribute or activity.
 # MAGIC 
+# MAGIC ### S_2
+# MAGIC - From this will further explore the column S_2
+# MAGIC - Now will see if it is possible to have more that one record per month of one customer.
+
+# COMMAND ----------
+
+s2_data = train_data.select('customer_ID', 'S_2')\
+  .withColumn('S_2_month', month('S_2'))\
+  .withColumn('S_2_year', year('S_2')) # We add year to separate March 2017 from March 2018
+s2_data.display()
+
+# COMMAND ----------
+
+monthly_records = s2_data.groupby(['customer_ID', 'S_2_month', 'S_2_year']).agg(count('S_2').alias('monthly_records'))
+monthly_records.filter(col('monthly_records') > 1).display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC __Comments__
+# MAGIC - It looks like we have only one record per month for a customer.
+# MAGIC - Now will investigate if every customer has a record for all the 13 months period we have in our data.
+# MAGIC - Further will look into the number of days between consecutive days. 
+# MAGIC - This will help us investigate wether the dates found in this column are customer driven or are due to system design or business rules.
+
+# COMMAND ----------
+
+months_occurance = monthly_records.groupby('customer_ID').agg(count('S_2_month').alias('month_occurance'))
+months_occurance.display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC __Comments__
+# MAGIC - Not every customer appears 13 times in our data.
+# MAGIC - Just look at the first 1000 rows, it appear that the number of months a customer appears is negatively skewed.
+# MAGIC - Now will look at the numbers day between consecutive dates of each customer
+
+# COMMAND ----------
+
+date_window = Window.partitionBy('customer_ID').orderBy(col('S_2').asc())
+
+s2_data = s2_data.withColumn('lag_date', lag('S_2', 1).over(date_window))\
+  .withColumn('lag_days', datediff( col('S_2'), col('lag_date')))
+s2_data.display()
+
+# COMMAND ----------
+
+s2_data.filter(col('customer_ID') == '000084e5023181993c2e1b665ac88dbb1ce9ef621ec5370150fc2f8bdca6202c').select('S_2_year', 'S_2_month', 'lag_days').display()
+
+# COMMAND ----------
+
+s2_data.filter(col('S_2_month') == 9).select('S_2_month','lag_days').display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC __Comments__
+# MAGIC - When we focus on rows of one customer, we noticed the variance in the number of days between consecutive days.
+# MAGIC - When we focus on one month and look at the first 1000 rows, we noticed that the number of days between consecutive days is independant of the month.
+# MAGIC - We can safely conclude that the dates found in column 'S_2' are customer driven.
+# MAGIC 
+# MAGIC #### **Conclusion**
+# MAGIC - From this we can conclude that the number of months and days between consecutive days for our customer varies.
+# MAGIC - This means that the dates are not due to system design or business rules.
+# MAGIC - Will look at how these relate with other columns as we continue EDA.
+
+# COMMAND ----------
+
+train_data = train_data.withColumn('month', month('S_2'))\
+  .withColumn('year', year('S_2'))\
+  .withColumn('lag_date', lag('S_2', 1).over(date_window))\
+  .withColumn('lag_days', datediff( col('S_2'), col('lag_date')))\
+  .na.fill(value = 0, subset = ['lag_days'])
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ### **Delinquency variables**
 # MAGIC - Now we will look at the just the Delinquency variables( D_* columns)
-# MAGIC - We also include the S2 and customer_ID columns.
-# MAGIC - As we will be repeating the approach of filtering out groups of columns the other 4 variable types, we will create a function for this.
+# MAGIC - We also include the customer_ID, S_2 and other date associated columns.
+# MAGIC - As we will be repeating the approach of filtering out groups of columns the other 4 variable types, hence we will create a function for this.
 
 # COMMAND ----------
 
@@ -139,8 +230,10 @@ def variables_sub_df(df,variables_prefix,*args):
 
 # COMMAND ----------
 
+other_columns = ['customer_ID', 'S_2', 'lag_date', 'lag_days', 'month', 'year']
+
 delinquency_columns_prefix = 'D_'
-other_columns = ['customer_ID', 'S_2']
+
 delinquency_data = variables_sub_df(train_data, delinquency_columns_prefix, *other_columns)
 delinquency_data.display()
 
@@ -156,6 +249,11 @@ delinquency_data.describe().display()
 # MAGIC - The following columns have large propotion of null values
 # MAGIC   - D42, D66, D73, D76, D87, D88, D108, D110, D111 and D134-138.
 # MAGIC - For these columns will suggest droping them for this iteration.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### **Categorical Columns**
 # MAGIC - Now will explore the categorical columns 'D_114', 'D_116', 'D_117', 'D_120', 'D_126', 'D_63', 'D_64', 'D_66' and 'D_68'
 # MAGIC - Will explore the possiblity of these categories remaining the same value for a customer regardless of the date.
 
@@ -167,6 +265,10 @@ delinquency_data.groupby('D_63').count().display()
 
 delinquency_data.groupby(['customer_ID']).agg(countDistinct('D_63').alias('D_63_change'))\
   .filter( col('D_63_change') > 1).display()
+
+# COMMAND ----------
+
+delinquency_data.select('D_63', 'D_45').display()
 
 # COMMAND ----------
 

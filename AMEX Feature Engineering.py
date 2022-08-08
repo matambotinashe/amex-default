@@ -22,7 +22,7 @@ from pyspark.sql.functions import col, max as max_, min as min_, mean, stddev_sa
 # MAGIC ## __Import Data__
 # MAGIC - Now will import our train data that is stored on Azure blod container.
 # MAGIC - The path to the data are in a separate notebook 'path_config' and will be ignored by git.
-# MAGIC - We are going to develop separate pipelines to apply the step take here for the test data.
+# MAGIC - We are going to develop a separate notebook to apply the step take here for the test data.
 
 # COMMAND ----------
 
@@ -30,7 +30,7 @@ from pyspark.sql.functions import col, max as max_, min as min_, mean, stddev_sa
 
 # COMMAND ----------
 
-train_data = spark.read.option('header', True).csv(train_data_path, inferSchema = True)
+train_data = spark.read.option('header', True).csv(test_data_path, inferSchema = True)
 train_data.display()
 
 # COMMAND ----------
@@ -272,7 +272,7 @@ cat_features.describe().display()
 window = Window.partitionBy('customer_ID').orderBy(col('S_2').asc())
 
 # For the earliest and latest date, we are using row between unbounded preceding and unbounded following 
-date_window = Window.partitionBy('customer_ID').orderBy(col('S_2').asc()).rowsBetween(-9223372036854775808, 9223372036854775807)
+date_window = Window.partitionBy('customer_ID').orderBy(col('S_2').asc()).rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing)
 
 dates_data = (
   train_data.select('customer_ID', 'S_2')
@@ -306,8 +306,8 @@ dates_features.describe().display()
 
 final_train_features = train_features.join(train_features_std, on = 'customer_ID')\
   .join(cat_features, on = 'customer_ID')\
-  .join(dates_features, on = 'customer_ID')\
-  .join(train_labels, on = 'customer_ID')
+  .join(dates_features, on = 'customer_ID')#\
+  #.join(train_labels, on = 'customer_ID')
 final_train_features.describe().display()
 
 # COMMAND ----------
@@ -318,4 +318,4 @@ final_train_features.describe().display()
 
 # COMMAND ----------
 
-final_train_features.coalesce(1).write.mode('overwrite').option('header', True).csv(train_data_output)
+final_train_features.coalesce(1).write.mode('overwrite').option('header', True).csv(test_data_output)
